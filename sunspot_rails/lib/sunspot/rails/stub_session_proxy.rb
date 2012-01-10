@@ -5,6 +5,7 @@ module Sunspot
 
       def initialize(original_session)
         @original_session = original_session
+        @connectionless_session = ConnectionlessSession.new
       end
 
       def index(*objects)
@@ -48,23 +49,28 @@ module Sunspot
       def commit
       end
 
-      def search(*types)
-        Search.new
+      def new_search(*types, &block)
+        @connectionless_session.new_search(*types, &block).extend(SearchStub)
       end
 
-      def new_search(*types)
-        Search.new
-      end
-      
-      def new_more_like_this(*args)
-        Search.new
+      def search(*types, &block)
+        # No need to execute, right!
+        new_search(*types, &block)
       end
 
-      class Search
-        
-        def build
-          self
+      def new_more_like_this(*args, &block)
+        @connectionless_session.new_more_like_this(*args, &block).extend(SearchStub)
+      end
+
+      class ConnectionlessSession < Sunspot::Session
+
+        def connection
+          nil
         end
+
+      end
+
+      module SearchStub
 
         def results
           PaginatedCollection.new
@@ -88,24 +94,23 @@ module Sunspot
           self
         end
       end
-      
-      
+
       class PaginatedCollection < Array
-        
+
         def total_count
           0
         end
         alias :total_entries :total_count
-        
+
         def current_page
           1
         end
-        
+
         def per_page
           30
         end
         alias :limit_value :per_page
-        
+
         def total_pages
           1
         end
@@ -134,9 +139,9 @@ module Sunspot
         def offset
           0
         end
-        
+
       end
-      
+
     end
   end
 end
